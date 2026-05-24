@@ -10,5 +10,11 @@ class Settings:
     ALGORITHM : str = os.getenv("ALGORITHM" , "HS256")
     DATABASE_URL : str = os.getenv("DATABASE_URL")
 
+    MAIL_USERNAME: str = os.getenv("MAIL_USERNAME")
+    MAIL_PASSWORD: str = os.getenv("MAIL_PASSWORD")
+    MAIL_FROM: str = os.getenv("MAIL_FROM")
+    MAIL_PORT: int = int(os.getenv("MAIL_PORT", "587"))
+    MAIL_SERVER: str = os.getenv("MAIL_SERVER")
+
 
 settings = Settings()

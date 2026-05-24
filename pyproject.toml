@@ -26,6 +26,7 @@ dependencies = [
     "starlette (>=1.0.0,<2.0.0)",
     "dotenv (>=0.9.9,<0.10.0)",
     "pydantic (>=2.13.4,<3.0.0)",
+    "fastapi-mail (>=1.6.4,<2.0.0)",
 ]
 
 [tool.poetry]

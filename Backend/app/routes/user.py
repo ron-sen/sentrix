@@ -14,8 +14,11 @@ from jose import jwt , JWTError
 
 from app.config import Settings
 from datetime import timedelta
-from app.models.userauth import User
+from app.models.userauth import User , VerificationToken
+from datetime import datetime
 
+from app.security.mail import send_verification_Email
+from app.security.token import secret_token , token_expiry
 
 router = APIRouter()
 
@@ -44,8 +47,23 @@ async def create_user_acc(user : CreateUser  , db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
+    token =  secret_token()
+    expiry = token_expiry()
 
-    return  create_user_acc
+    verification_token = VerificationToken(
+        user_id = new_user.id ,
+        token = token ,
+        token_type = "email verification",
+        expires_at = expiry
+    )
+    db.add(verification_token)
+    db.commit()
+    await send_verification_Email(user.mail, token)
+
+
+    return  {
+        "message": "User registered sucessfully ! "
+    }
 
 
 @router.post("/signin" , status_code=status.HTTP_202_ACCEPTED)
@@ -84,8 +102,31 @@ async def signin_for_access_token(
     }
 
 
+@router.get("/verify" , status_code=status.HTTP_200_OK)
+async def verify_email(token : str , response : Response , db : Session = Depends(get_db)):
 
+    token_verify = db.query(VerificationToken).filter(VerificationToken.token == token).first()
 
+    if not token_verify :
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Token not found"
+        )
+    
+    if token_verify.used == True:
+        raise HTTPException(status_code=400, detail="Token already used")
 
+    if token_verify.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Token expired")
+    
+    user = db.query(User).filter(User.id == token_verify.user_id).first()
+
+    user.is_verified = True 
+    db.commit()
+    return{
+        "message":"Email verified successfully"
+    }
+
+    
 
 
