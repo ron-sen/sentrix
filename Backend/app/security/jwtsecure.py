@@ -8,6 +8,13 @@ import jwt
 from passlib.context import CryptContext
 from app.config import settings
 
+from fastapi import Depends , HTTPException , status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import Session
+from app.db.connection import get_db
+from app.models.userauth import User
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl = "signin")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated ="auto")
 
 def get_password_hash(password : str):
@@ -27,3 +34,29 @@ def create_access_token(data : dict):
     encoded_jwt = jwt.encode(to_encode , settings.SECRET_KEY , algorithm=settings.ALGORITHM)
 
     return encoded_jwt
+
+
+def get_current_user(token: str = Depends(oauth2_scheme) , db : Session = Depends(get_db)):
+    credential_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED , 
+        detail="Could not validate credentials",
+        headers={"www-Authenticate": "Bearer"}
+    )
+    try :
+        paylaod = jwt.decode(token , settings.SECRET_KEY , algorithms=[settings.ALGORITHM])
+        email : str = paylaod.get("sub")
+        if email is None :
+            raise credential_exception
+    except jwt.InvalidTokenError:
+        raise credential_exception
+    
+    user = db.query(User).filter(User.mail == email).first()
+    if user is None :
+        raise credential_exception
+    return user
+
+
+    
+
+
+

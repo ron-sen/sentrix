@@ -3,10 +3,10 @@ from fastapi import APIRouter , Depends , HTTPException , Response , status , Re
 from typing import Annotated
 from sqlalchemy.orm import Session
 from app.db.connection import get_db
-from app.schemas.uservalidate import ValidateUser , CreateUser
+from app.schemas.uservalidate import ValidateUser , CreateUser , PersonalProfileValidation  , PersonalProfileRespons 
 
 from fastapi.security import OAuth2PasswordRequestForm
-from app.security.jwtsecure import verify_password , create_access_token , get_password_hash
+from app.security.jwtsecure import verify_password , create_access_token , get_password_hash , get_current_user
 
 #from authlib.integrations.starlette_client import OAuth
 from starlette.responses import RedirectResponse
@@ -14,7 +14,7 @@ from jose import jwt , JWTError
 
 from app.config import Settings
 from datetime import timedelta
-from app.models.userauth import User , VerificationToken
+from app.models.userauth import User , VerificationToken , PersonalProfile
 from datetime import datetime
 
 from app.security.mail import send_verification_Email
@@ -72,7 +72,7 @@ async def signin_for_access_token(
     form_data : Annotated[OAuth2PasswordRequestForm , Depends()],
     db : Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.mail == form_data.password).first()
+    user = db.query(User).filter(User.mail == form_data.username).first()
 
     if not user or not verify_password(form_data.password , user.hashed_password):
         raise HTTPException(
@@ -127,6 +127,45 @@ async def verify_email(token : str , response : Response , db : Session = Depend
         "message":"Email verified successfully"
     }
 
+
+@router.post("/perosnal-profile" , status_code=status.HTTP_200_OK)
+async def create_personal_user_profile(
+    response : Response ,
+    profile : PersonalProfileValidation ,
+    db : Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
     
+    exisiting = db.query(PersonalProfile).filter(PersonalProfile.user_id == current_user.id).first()
+
+    if exisiting:
+        return exisiting 
+    else :
+             
+        new_profile = PersonalProfile(
+        
+        user_id = current_user.id ,
+        username = profile.username,
+        first_name = profile.first_name,
+        last_name = profile.last_name,
+        date_of_birth = profile.date_of_birth,
+        gender = profile.gender,
+        bio = profile.bio,
+        profile_picture = profile.profile_picture, # it would be url this url will be from frontend img upload , so this field will be from user but from frontend , 
+        city = profile.city,
+        state = profile.state,
+        country = profile.country ,
+        phone_number = profile.phone_number
+
+    )
+   
+
+    db.add(new_profile)
+    db.commit()
+    db.refresh(new_profile)
+
+    return {
+        "message" : "Profile created sucessfully"
+    }
 
 

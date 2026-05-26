@@ -57,7 +57,7 @@ class PersonalProfileValidation(BaseModel):
         first_name : Optional[str]
         last_name : Optional[str]
         date_of_birth : Optional[date]
-        age : Optional[str]
+        age : Optional[int]
         gender : Optional[str]
         bio : Optional[str]
         profile_picture : Optional[str]
@@ -69,7 +69,7 @@ class PersonalProfileValidation(BaseModel):
 
         @computed_field
         @property
-        def age(self) -> Optional[int]:
+        def validate_age(self) -> Optional[int]:
             if self.date_of_birth:
                 today = date.today()
                 return today.year - self.date_of_birth.year - (
