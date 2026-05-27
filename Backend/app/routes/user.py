@@ -3,14 +3,14 @@ from fastapi import APIRouter , Depends , HTTPException , Response , status , Re
 from typing import Annotated
 from sqlalchemy.orm import Session
 from app.db.connection import get_db
-from app.schemas.uservalidate import ValidateUser , CreateUser , PersonalProfileValidation  , PersonalProfileRespons 
+from app.schemas.uservalidate import ValidateUser , CreateUser , PersonalProfileValidation  ,  PersonalProfileResponse , PersonalProfileUpdate
 
 from fastapi.security import OAuth2PasswordRequestForm
-from app.security.jwtsecure import verify_password , create_access_token , get_password_hash , get_current_user
+from app.security.jwtsecure import verify_password , create_access_token , create_refresh_token , get_password_hash , get_current_user
 
 #from authlib.integrations.starlette_client import OAuth
 from starlette.responses import RedirectResponse
-from jose import jwt , JWTError
+import jwt
 
 from app.config import Settings
 from datetime import timedelta
@@ -25,7 +25,7 @@ router = APIRouter()
 
 @router.get("/users")
 def get_users(db : Session = Depends(get_db)):
-    return db.query(User).all
+    return db.query(User).all()
 
 
 
@@ -84,6 +84,7 @@ async def signin_for_access_token(
     # JWT
 
     access_token = create_access_token(data= {"sub": user.mail})
+    refresh_token = create_refresh_token(data= {"sub": user.mail})
 
     # cookies
 
@@ -95,9 +96,18 @@ async def signin_for_access_token(
         secure = True 
     )
 
+    response.set_cookie(
+        key = "refresh_token" ,
+        value = refresh_token ,
+        httponly = True ,
+        samesite = "lax" ,
+        secure = True 
+    )
+
     return{
         "message" : "Logged in sucessfull",
         "access_token" : access_token ,
+        "refresh_token" : refresh_token ,
         "token_type" : "bearer"
     }
 
@@ -122,6 +132,7 @@ async def verify_email(token : str , response : Response , db : Session = Depend
     user = db.query(User).filter(User.id == token_verify.user_id).first()
 
     user.is_verified = True 
+    token_verify.used = True
     db.commit()
     return{
         "message":"Email verified successfully"
@@ -167,5 +178,117 @@ async def create_personal_user_profile(
     return {
         "message" : "Profile created sucessfully"
     }
+
+@router.get("/personal-profile" , status_code=status.HTTP_202_ACCEPTED)
+async def getting_personal_profile( 
+    response : Response,
+    db : Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    
+    profile  = db.query(PersonalProfile).filter(PersonalProfile.user_id == current_user.id).first()
+    
+    if not profile :
+        raise HTTPException(
+            status_code = 404 , detail = "profile not found"
+        )
+    return profile
+
+
+@router.post("/refresh")
+async def refresh_token(
+    response : Response ,
+    refresh_token : str = Cookie(None)
+):
+    if not refresh_token:
+        raise HTTPException(
+            status_code=401 , detail= "No refresh token"
+        )
+    try :
+        payload = jwt.decode(refresh_token, Settings.SECRET_KEY , algorithms= [Settings.ALGORITHM])
+        email = payload.get("sub")
+
+        if email is None :
+            raise HTTPException(status_code=401 , detail= "Invalid refresh token")
+    except jwt.InvalidTokenError :
+        raise HTTPException(status_code=401 , detail = "Invalid refresh token")
+    
+    #creating new access token 
+
+    new_access_token = create_access_token(
+        data={
+            "sub": email
+        }
+    )
+
+    response.set_cookie(
+        key="access_token",
+        value=new_access_token,
+        httponly=True , 
+        secure = True ,
+        samesite= "lax"
+    )
+
+    return {
+        "message":"Access token refreshed "
+    }
+
+
+@router.post("/signout" , status_code=status.HTTP_200_OK)
+async def signout(response : Response):
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
+    return {
+        "message":"Logged out successfully"
+    }
+
+
+@router.patch("/personal-profile")
+async def update_personal_profile(
+    profile_update : PersonalProfileUpdate ,
+    db : Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    profile  = db.query(PersonalProfile).filter(PersonalProfile.user_id == current_user.id).first()
+
+    update_data = profile_update.model_dump(exclude_unset=True)
+
+    if not profile :
+        raise HTTPException(
+            status_code= 404 ,  detail = "profile not found"
+        )
+    else :
+        for field , value  in update_data.items():
+            setattr(profile , field , value )
+
+            update_profile = PersonalProfileUpdate(
+
+        username = profile.username,
+        first_name = profile.first_name,
+        last_name = profile.last_name,
+        date_of_birth = profile.date_of_birth,
+        gender = profile.gender,
+        bio = profile.bio,
+        profile_picture = profile.profile_picture, # it would be url this url will be from frontend img upload , so this field will be from user but from frontend , 
+        city = profile.city,
+        state = profile.state,
+        country = profile.country ,
+        phone_number = profile.phone_number
+
+    )
+            
+            db.add(update_profile)
+            db.commit()
+            db.refresh(update_profile)
+
+
+    return{
+        "message": "Profile updated sucessfully "
+    }
+
+
+
+
+
 
 

@@ -51,33 +51,44 @@ class PersonalProfileValidation(BaseModel):
         return dob
     
 
+class PersonalProfileResponse(BaseModel):
 
-    class PersonalProfileResponse(BaseModel):
-        username : str
-        first_name : Optional[str]
-        last_name : Optional[str]
-        date_of_birth : Optional[date]
-        age : Optional[int]
-        gender : Optional[str]
-        bio : Optional[str]
-        profile_picture : Optional[str]
-        city : Optional[str]
-        state : Optional[str]
-        country : Optional[str]
+    username : str
+    first_name : Optional[str]
+    last_name : Optional[str]
+    date_of_birth : Optional[str]
+    gender : Optional[str]
+    bio : Optional[str]
+    profile_pciture : Optional[str]
+    city : Optional[str]
+    state :Optional[str]
+    country : Optional[str]
 
-        model_config = ConfigDict(from_attributes = True)
+    model_config = ConfigDict(from_attributes=True)
 
-        @computed_field
-        @property
-        def validate_age(self) -> Optional[int]:
-            if self.date_of_birth:
-                today = date.today()
-                return today.year - self.date_of_birth.year - (
-                    (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day)
-                )
-            return None
+    @computed_field
+    @property
+    def age(self) -> Optional[int]:
+        if self.date_of_birth:
+            today = date.today()
+            return today.year - self.date_of_birth.year - (
+                (today.month , today.day) < (self.date_of_birth.month , self.date_of_birth.day)
+            )
+        return None
+
+class PersonalProfileUpdate(BaseModel):
+    username: Optional[str] = Field(None, min_length=3, max_length=50)
+    first_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    last_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+    bio: Optional[str] = None
+    profile_picture: Optional[str] = None
+    city: Optional[str] = Field(None, min_length=1, max_length=100)
+    state: Optional[str] = Field(None, min_length=1, max_length=100)
+    country: Optional[str] = Field(None, min_length=1, max_length=100)
+    phone_number: Optional[str] = Field(None, min_length=1, max_length=20)
 
 
-
-
-
+        
+        

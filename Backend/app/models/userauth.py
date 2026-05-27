@@ -59,3 +59,4 @@ class PersonalProfile(Base):
     updated_at : Mapped[datetime] = mapped_column(TIMESTAMP , server_default=func.current_timestamp() , onupdate=func.current_timestamp())
 
     user = relationship("User" , back_populates="personal_profile")
+
