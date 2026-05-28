@@ -12,7 +12,7 @@ from app.security.jwtsecure import verify_password , create_access_token , creat
 from starlette.responses import RedirectResponse
 import jwt
 
-from app.config import Settings
+from app.config import settings
 from datetime import timedelta
 from app.models.userauth import User , VerificationToken , PersonalProfile
 from datetime import datetime
@@ -205,7 +205,7 @@ async def refresh_token(
             status_code=401 , detail= "No refresh token"
         )
     try :
-        payload = jwt.decode(refresh_token, Settings.SECRET_KEY , algorithms= [Settings.ALGORITHM])
+        payload = jwt.decode(refresh_token, settings.SECRET_KEY , algorithms= [settings.ALGORITHM])
         email = payload.get("sub")
 
         if email is None :
@@ -251,35 +251,18 @@ async def update_personal_profile(
 ):
     profile  = db.query(PersonalProfile).filter(PersonalProfile.user_id == current_user.id).first()
 
-    update_data = profile_update.model_dump(exclude_unset=True)
-
     if not profile :
         raise HTTPException(
             status_code= 404 ,  detail = "profile not found"
         )
-    else :
-        for field , value  in update_data.items():
-            setattr(profile , field , value )
+    
+    update_data = profile_update.model_dump(exclude_unset=True)
 
-            update_profile = PersonalProfileUpdate(
-
-        username = profile.username,
-        first_name = profile.first_name,
-        last_name = profile.last_name,
-        date_of_birth = profile.date_of_birth,
-        gender = profile.gender,
-        bio = profile.bio,
-        profile_picture = profile.profile_picture, # it would be url this url will be from frontend img upload , so this field will be from user but from frontend , 
-        city = profile.city,
-        state = profile.state,
-        country = profile.country ,
-        phone_number = profile.phone_number
-
-    )
+    for field , value  in update_data.items():
+        setattr(profile , field , value )
             
-            db.add(update_profile)
-            db.commit()
-            db.refresh(update_profile)
+    db.commit()
+    db.refresh(profile)
 
 
     return{
