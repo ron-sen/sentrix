@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Mapped , mapped_column , relationship
 from sqlalchemy import String , Text , INTEGER , ForeignKey , TIMESTAMP , func , Boolean , Date
 from app.db.connection import Base
+from app.models.portfolio_auth import PortfolioInfo
 from datetime import datetime 
 from typing import Optional
 
@@ -20,9 +21,10 @@ class User(Base):
 
     personal_profile = relationship("PersonalProfile" , back_populates="user" )
 
-    # verification table
+    portfolios = relationship("PortfolioInfo" , back_populates="user")
+   
 
-
+ # verification table
 class VerificationToken(Base):
 
     __tablename__ = "verification_tokens"
