@@ -1,7 +1,6 @@
 
 from sqlalchemy.orm import Mapped , mapped_column , relationship
 from sqlalchemy import String , Text , Integer , ForeignKey , TIMESTAMP , func , Boolean , Date , Numeric
-from app.models.userauth import User
 from sqlalchemy import CheckConstraint
 from app.db.connection import Base
 from datetime import datetime
