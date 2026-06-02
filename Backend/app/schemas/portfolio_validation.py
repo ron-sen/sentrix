@@ -57,5 +57,37 @@ class PortfolioUpdate(BaseModel):
     rebalance_frequency : Optional[Literal['MANUAL', 'DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY']] = None
 
 
+class AssetsInfo(BaseModel):
 
-   
+    symbol : Annotated[str , Field(... , description="none" , min_length=3 , max_length=32 )]
+
+    name : Annotated[str , Field(..., description="Name of Assets" , min_length=3 , max_length=120)]
+
+    asset_type : Annotated[str , Field(..., description="Type of Asset" , min_length=3 , max_length=24)]
+
+    network : Optional[str] =  Field(None , description="none") 
+    contract_address : Optional[str] = Field(None , description="none")
+    coingecko_id : Optional[str] = Field(None , description="none")
+    cmc_id : Optional[int] = Field(None , description="none" )
+
+    decimals : Annotated[str , Field(... , description="none" )]
+
+
+class PortfolioSourceValidation(BaseModel):
+
+
+    source_type : Annotated[str , Field(..., description="source type of coin" , min_length=3 , max_length=24)]
+
+    provider_name : Annotated[str , Field(... , description="provider's name "  , min_length=3 ,max_length=80)]
+
+    account_label : Optional[str] = Field(None , description="none" , min_length=3 , max_length=100)
+
+    wallet_address : Optional[str] = Field(None , description="none" , min_length=3 , max_length=160)
+
+    network : Optional[str] = Field(None , description="none" , min_length=3 , max_length= 80)
+
+    external_account_id : Optional[str] = Field(None  , description="none" ,min_length=3 , max_length=160)
+
+    sync_status  : Annotated[str , Field(..., description="none" , min_length=3  , max_length=24)]
+
+    

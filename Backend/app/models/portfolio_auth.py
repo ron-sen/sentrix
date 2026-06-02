@@ -53,3 +53,75 @@ class PortfolioInfo(Base):
     )
 
     user = relationship("User", back_populates="portfolios")
+
+
+class Assets(Base):
+
+    __tablename__ = "assets"
+
+    asset_id : Mapped[int] = mapped_column(Integer , primary_key=True)
+    symbol : Mapped[str] = mapped_column(String(32) , nullable=False)
+    name : Mapped[str] = mapped_column(String(120) , nullable=False)
+
+    asset_type : Mapped[str] = mapped_column(String(24) , nullable=False , default="CRYPTO")
+
+    network : Optional[str] = mapped_column(String(80))
+    contract_address : Optional[str] = mapped_column(String(128))
+    coingecko_id : Optional[str] = mapped_column(String(120))
+    cmc_id : Optional[str] = mapped_column(String(120))
+    decimals : Mapped[int] = mapped_column(Integer , nullable=False , default=18)
+    is_active : Mapped[bool] = mapped_column(Boolean , nullable=False  , default=True)
+
+    created_at : Mapped[datetime] = mapped_column(TIMESTAMP , nullable= False , server_default=func.current_timestamp())
+
+    updated_at : Mapped[datetime] = mapped_column(TIMESTAMP  , nullable=False , server_default=func.current_timestamp())
+
+    __table_args__= (
+
+        CheckConstraint(
+            "asset_type IN ( 'CRYPTO', 'STABLECOIN', 'FIAT', 'TOKENIZED_ASSET')",name="chk_asset_type"
+        ),
+        CheckConstraint(
+            "decimals BETWEEN 0 AND 36", name="chk_decimals"
+        )
+
+    )
+
+class PortfolioSources(Base):
+
+    __tablename__ ="portfolio_sources"
+
+    source_id : Mapped[int] = mapped_column(Integer , primary_key=True)
+    portfolio_id : Mapped[int] = mapped_column(ForeignKey("portfolios.portfolio_id" , ondelete="CASCADE"))
+
+    source_type : Mapped[str] = mapped_column(String(24) , nullable=False)
+
+    provider_name : Mapped[str] = mapped_column(String(80) , nullable=False)
+    account_label : Optional[str] = mapped_column(String(100))
+
+    wallet_address : Optional[str] = mapped_column(String(160))
+    network : Optional[str] = mapped_column(String(80))
+
+    external_account_id : Optional[str] = mapped_column(String(160))
+
+    sync_status : Mapped[str] = mapped_column(String(24) , nullable=False , default="NOT_CONNECTED")
+
+
+    last_synced_at : Mapped[datetime] = mapped_column(TIMESTAMP , server_default=func.current_timestamp())
+
+    created_at : Mapped[datetime] = mapped_column(TIMESTAMP , nullable=False  ,  server_default=func.current_timestamp())
+
+    updated_at : Mapped[datetime] = mapped_column(TIMESTAMP , nullable=False , server_default=func.current_timestamp())
+
+
+    __table_args__ = (
+        CheckConstraint(
+            "source_type IN ('EXCHANGE', 'WALLET', 'MANUAL', 'CUSTODIAN')",name="chk_source_type"
+        ),
+
+        CheckConstraint(
+            "sync_status IN ('NOT_CONNECTED', 'ACTIVE', 'PAUSED', 'ERROR')",
+            name="chk_sync_status"
+        )
+    )
+
