@@ -5,10 +5,12 @@ from app.db.connection import get_db
 from sqlalchemy.orm import Session 
 
 from app.models.portfolio_auth import PortfolioInfo
-from app.schemas.portfolio_validation import ValidatePortfolio , PortfolioUpdate , PortfolioResponse
+from app.schemas.portfolio_validation import ValidatePortfolio , PortfolioUpdate , PortfolioResponse , AssetsInfo , AssetsResponse , PortfolioSourceValidation , PortfolioSourceResponse , PortfolioSourceUpdate , FilterParams , SortFields , SortOrder
 from app.security.jwtsecure import get_current_user
 
-router = APIRouter()
+from app.services.portfolio_service import PortfolioServices , AssetsService
+
+router = APIRouter(tags=["Portfolios"])
 
 # POST /portfolio -- create
 @router.post("/portfolio" , status_code= status.HTTP_201_CREATED)
@@ -123,3 +125,102 @@ async def deleting_portfolio(
     return {
         "message": "Portfolio archivd successfully"
     }
+
+
+# post / portfolio source  , portolio_id as parameter
+
+@router.post("/portfolio/{portfolio_id}/sources" , status_code=status.HTTP_201_CREATED , response_model= PortfolioSourceResponse ,)
+async def create_portfolio_source(
+    portfolio_id : int , 
+    portfolio_source  : PortfolioSourceValidation , 
+    db : Session = Depends(get_db),
+    current_user = Depends(get_current_user) ,
+):
+    service = PortfolioServices(db)
+    return service.creating_portfolio_info(portfolio_id= portfolio_id ,data= portfolio_source)
+
+
+# get portfolio source , portolio_id as paramete , all soruces
+
+@router.get("/portfolio/{portfolio_id/sources}" , status_code=status.HTTP_200_OK , response_model=list[PortfolioSourceResponse ])
+async def get_portfolio_source(
+    portfolio_id : int , # sent by client via querry 
+    db : Session = Depends(get_db) ,
+    current_user = Depends(get_current_user) ,
+):
+    service =  PortfolioServices(db)
+    return service.getting_portfolio_sources(portfolio_id= portfolio_id)
+
+
+#  get portfolio source , portfolio_id and source_id , specific one 
+@router.get("/{portfolio_id}/source/{source_id}" , response_model= PortfolioSourceResponse)
+async def get_portfolio_source(
+    portfolio_id : int , 
+    source_id : int , 
+    db : Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    service = PortfolioServices(db)
+    return service.getting_portfolio_source(
+        portfolio_id=portfolio_id ,
+        source_id=source_id ,
+        current_user=current_user
+    )
+
+
+# patch , portfoli source update , portfolio_id and source_id
+
+
+@router.patch("/{portfolio_id}/sources/{source_id}", response_model=PortfolioSourceResponse)
+async def update_portfolio_source(
+    portfolio_id: int,
+    source_id: int,
+    data: PortfolioSourceUpdate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)  # Added to ensure they own it if needed
+):
+    service = PortfolioServices(db)
+    return service.update_portfolio_source(
+        portfolio_id=portfolio_id, 
+        source_id=source_id, 
+        data=data
+    )
+# delete , portfolio source detele , portfolio_id and source_id
+
+@router.delete("/{portfolio_id}/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_portfolio_source(
+    portfolio_id: int,
+    source_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    service = PortfolioServices(db)
+    service.archive_portfolio_source(portfolio_id=portfolio_id, source_id=source_id)
+    return None
+
+
+@router.get("/{asset_id}/" ,status_code= status.HTTP_200_OK) 
+async def list_assets(
+    asset_id : int , 
+    db : Session = Depends(get_db) ,
+    current_user = Depends(get_current_user)
+):
+    service = AssetsService(db)
+    return service.list_assets(
+        asset_id=asset_id , 
+    )
+
+@router.get("/assets" , status_code=status.HTTP_200_OK)
+async def read_assets(
+    params : FilterParams = Depends(),
+    search_term : str = None , 
+    filter_type : str = None ,
+    sort_by : str = "name",
+    sort_order : str = "asc",
+    offset: int = 0 ,
+    limit : int = 10 ,
+    db : Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    service = AssetsService(db)
+    return service.get_assets(search_term , filter_type ,sort_by , sort_order , offset , limit)
