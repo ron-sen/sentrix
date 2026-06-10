@@ -212,7 +212,6 @@ async def list_assets(
 
 @router.get("/assets" , status_code=status.HTTP_200_OK)
 async def read_assets(
-    params : FilterParams = Depends(),
     search_term : str = None , 
     filter_type : str = None ,
     sort_by : str = "name",
