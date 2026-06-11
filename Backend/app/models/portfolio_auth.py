@@ -65,10 +65,10 @@ class Assets(Base):
 
     asset_type : Mapped[str] = mapped_column(String(24) , nullable=False , default="CRYPTO")
 
-    network : Optional[str] = mapped_column(String(80))
-    contract_address : Optional[str] = mapped_column(String(128))
-    coingecko_id : Optional[str] = mapped_column(String(120))
-    cmc_id : Optional[str] = mapped_column(String(120))
+    network: Mapped[Optional[str]] = mapped_column(String(80))
+    contract_address: Mapped[Optional[str]] = mapped_column(String(128))
+    coingecko_id: Mapped[Optional[str]] = mapped_column(String(120))
+    cmc_id: Mapped[Optional[str]] = mapped_column(String(120))
     decimals : Mapped[int] = mapped_column(Integer , nullable=False , default=18)
     is_active : Mapped[bool] = mapped_column(Boolean , nullable=False  , default=True)
 
@@ -97,12 +97,12 @@ class PortfolioSources(Base):
     source_type : Mapped[str] = mapped_column(String(24) , nullable=False)
 
     provider_name : Mapped[str] = mapped_column(String(80) , nullable=False)
-    account_label : Optional[str] = mapped_column(String(100))
+    account_label : Mapped[Optional[str]] = mapped_column(String(100))
 
-    wallet_address : Optional[str] = mapped_column(String(160))
-    network : Optional[str] = mapped_column(String(80))
+    wallet_address : Mapped[Optional[str]] = mapped_column(String(160))
+    network : Mapped[Optional[str]] = mapped_column(String(80))
 
-    external_account_id : Optional[str] = mapped_column(String(160))
+    external_account_id : Mapped[Optional[str]] = mapped_column(String(160))
 
     sync_status : Mapped[str] = mapped_column(String(24) , nullable=False , default="NOT_CONNECTED")
 
