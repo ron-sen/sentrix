@@ -7,6 +7,9 @@ from app.db.connection import get_db
 from fastapi import Depends
 from typing import Annotated
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
 from app.models.portfolio_auth import PortfolioInfo  ,Assets , PortfolioSources
 from app.schemas.portfolio_validation import ValidatePortfolio , PortfolioResponse ,PortfolioUpdate  , AssetsInfo , AssetsResponse , PortfolioSourceValidation , PortfolioSourceResponse , PortfolioSourceUpdate , FilterParams , SortOrder , SortFields
 
@@ -17,11 +20,11 @@ from app.services.exception import PortfolioSourceConflict , PortfolioSourceNotF
 
 class PortfolioServices :
 
-    def __init__(self , db : Session):
+    async def __init__(self , db : AsyncSession):
         self.db = db
 
     # post / portfolio source  , portolio_id as parameter
-    def creating_portfolio_info(self , portfolio_id : int , data : PortfolioSourceValidation):
+    async def creating_portfolio_info(self , portfolio_id : int , data : PortfolioSourceValidation):
         source = PortfolioSources(
 
             portfolio_id = portfolio_id , 
@@ -35,31 +38,28 @@ class PortfolioServices :
         )
 
         try :
-            self.db.add(source)
-            self.db.commit()
-            self.db.refresh(source)
+            await self.db.add(source)
+            await self.db.commit()
+            await self.db.refresh(source)
             return source 
         except IntegrityError:
-            self.db.rollback()
+            await self.db.rollback()
             raise PortfolioSourceConflict()
         
     # get portfolio source , portolio_id as paramete , all soruces
 
-    def getting_portfolio_sources(self, portfolio_id: int) -> list[PortfolioSources]:
-        return (
-            self.db.query(PortfolioSources)
-            .filter(PortfolioSources.portfolio_id == portfolio_id).all()
-    )
+    async def getting_portfolio_sources(self, portfolio_id: int) -> list[PortfolioSources]:
+
+        result = await self.db.execute(select(PortfolioSources).where(PortfolioSources.portfolio_id == portfolio_id))
+        return result.scalars().all()
+    
     #  get portfolio source , portfolio_id and source_id , specific one 
 
-    def getting_portfolio_source(self , portfolio_id : int , source_id : int ) -> PortfolioSources :
-        portfolio_source =(
-            self.db.query(PortfolioSources).filter(
-                PortfolioSources.portfolio_id ==portfolio_id , 
-                PortfolioSources.source_id ==  source_id 
-        ).first()
-    
-    )
+    async def getting_portfolio_source(self , portfolio_id : int , source_id : int ) -> PortfolioSources :
+
+        result = await self.db.execute(select(PortfolioSources).where(PortfolioSources.portfolio_id ==portfolio_id , 
+                PortfolioSources.source_id ==  source_id ))
+        portfolio_source = result.scalars().first()
 
         if portfolio_source is None :
             raise PortfolioSourceNotFound()
@@ -68,9 +68,9 @@ class PortfolioServices :
     
 
     # patch , portfoli source update , portfolio_id and source_id
-    def update_portfolio_source(self , portfolio_id : int , soruce_id : int , data :  PortfolioSourceUpdate) -> PortfolioSources :
+    async def update_portfolio_source(self , portfolio_id : int , soruce_id : int , data :  PortfolioSourceUpdate) -> PortfolioSources :
 
-        portfolio_source = self.getting_portfolio_source(portfolio_id  , soruce_id , current_user=None)
+        portfolio_source = self.getting_portfolio_source(portfolio_id  , soruce_id)
         
         update_source = data.model_dump(exclude_unset=True)        
     
@@ -78,47 +78,45 @@ class PortfolioServices :
             setattr(portfolio_source, field , value)
 
         try : 
-            self.db.commit()
-            self.db.refresh(portfolio_source)
+            await self.db.commit()
+            await self.db.refresh(portfolio_source)
             return portfolio_source
         except IntegrityError :
-            self.db.rollback()
+            await self.db.rollback()
             raise PortfolioSourceConflict()
         
 
     # delete , portfolio source detele , portfolio_id and source_id
     
-    def archive_portfolio_source( self , portfolio_id : int , source_id:int ) -> None : 
-        portfolio_source_delete = (
-            self.db.query(PortfolioSources).filter(
-                PortfolioSources.portfolio_id ==portfolio_id ,
-                PortfolioSources.source_id == source_id 
-            ).first()
-        )
+    async def archive_portfolio_source( self , portfolio_id : int , source_id:int ) -> None : 
+
+        result = await self.db.execute(select(PortfolioSources).where(PortfolioSources.portfolio_id ==portfolio_id ,
+                PortfolioSources.source_id == source_id))
+        portfolio_source_delete = result.scalars().first()
+        
 
         if not portfolio_source_delete:
             raise PortfolioSourceNotFound()
 
         try : 
-            self.db.delete(portfolio_source_delete)
-            self.db.commit()
+            await self.db.delete(portfolio_source_delete)
+            await self.db.commit()
         except IntegrityError :
-            self.db.rollback()
+            await self.db.rollback()
             raise  NoContent()
 
 
 
 class AssetsService :
     
-    def __init__(self , db : Session):
+    async def __init__(self , db : AsyncSession):
         self.db = db
 
     # asset listing  - by exact ID 
     
-    def list_assets(self , asset_id : int  ):
-        asset =  self.db.query(Assets).filter(
-            Assets.asset_id == asset_id 
-        ).first()
+    async def list_assets(self , asset_id : int  ):
+        result = await self.db.execute(select(Assets).where(Assets.asset_id == asset_id))
+        asset = result.scalars().first()
 
 
         if not asset :
@@ -129,11 +127,11 @@ class AssetsService :
     # asset listing by serch/filter  , name  ,type  etc 
     #* searching and fitering 
 
-    def get_assets(self , search_term: str = None , filter_type : str = None , sort_by : str = "name" , sort_order : str = "asc" , offset : int = 0 ,limit : int = 10 ):
+    async def get_assets(self , search_term: str = None , filter_type : str = None , sort_by : str = "name" , sort_order : str = "asc" , offset : int = 0 ,limit : int = 10 ):
         
         # define base query 
 
-        asset = self.db.query(Assets)
+        asset  = await self.db.execute(select(Assets))
 
         if search_term is not None  and search_term.strip() != "" :
 

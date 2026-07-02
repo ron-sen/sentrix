@@ -4,6 +4,9 @@ from fastapi import APIRouter , Depends , HTTPException , Response , status , Re
 from app.db.connection import get_db
 from sqlalchemy.orm import Session 
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
 from app.models.portfolio_auth import PortfolioInfo
 from app.schemas.portfolio_validation import ValidatePortfolio , PortfolioUpdate , PortfolioResponse , AssetsInfo , AssetsResponse , PortfolioSourceValidation , PortfolioSourceResponse , PortfolioSourceUpdate , FilterParams , SortFields , SortOrder
 from app.security.jwtsecure import get_current_user
@@ -14,7 +17,7 @@ router = APIRouter(tags=["Portfolios"])
 
 # POST /portfolio -- create
 @router.post("/portfolio" , status_code= status.HTTP_201_CREATED)
-async def create_portfolio( portfolio : ValidatePortfolio  , db : Session = Depends(get_db) , current_user = Depends(get_current_user)):
+async def create_portfolio( portfolio : ValidatePortfolio  , db : AsyncSession= Depends(get_db) , current_user = Depends(get_current_user)):
  
 
     new_portfolio = PortfolioInfo(
@@ -29,9 +32,9 @@ async def create_portfolio( portfolio : ValidatePortfolio  , db : Session = Depe
             is_default = portfolio.is_default 
         )
     
-    db.add(new_portfolio)
-    db.commit()
-    db.refresh(new_portfolio)
+    await db.add(new_portfolio)
+    await db.commit()
+    await db.refresh(new_portfolio)
 
     return{
         "message" : "Portfolio created sucessfully "
@@ -41,22 +44,21 @@ async def create_portfolio( portfolio : ValidatePortfolio  , db : Session = Depe
 # GET /portflio -- get all portfolios for current user 
 
 @router.get("/portfolios" , status_code=status.HTTP_200_OK)
-async def getting_all_user_portfolios(db : Session = Depends(get_db) , current_user = Depends(get_current_user)):
+async def getting_all_user_portfolios(db : AsyncSession = Depends(get_db) , current_user = Depends(get_current_user)):
 
-    return  db.query(PortfolioInfo).filter(PortfolioInfo.user_id == current_user.id).all()
+    result =  await db.execute(select(PortfolioInfo).where(PortfolioInfo.user_id == current_user.id))
+    return  result.scalars().all()
     
 
 # GET /Portfolio/{portfolio_id} -- get specific portfolio
 
 @router.get("/portfolio/{portfolio_id}" , status_code=status.HTTP_200_OK)
-async def users_specific_portfolio( portfolio_id : int , db : Session = Depends(get_db) , current_user = Depends(get_current_user)):
+async def users_specific_portfolio( portfolio_id : int , db : AsyncSession = Depends(get_db) , current_user = Depends(get_current_user)):
 
-    portfolio = db.query(PortfolioInfo).filter(
-
-        PortfolioInfo.portfolio_id == portfolio_id ,
-        PortfolioInfo.user_id == current_user.id
-
-    ).first()
+    result = await db.execute(select(PortfolioInfo).where(    PortfolioInfo.portfolio_id == portfolio_id ,
+        PortfolioInfo.user_id == current_user.id))
+    
+    portfolio =result.scalars().first()
 
     if not portfolio :
         raise HTTPException(
@@ -72,17 +74,13 @@ async def users_specific_portfolio( portfolio_id : int , db : Session = Depends(
 async def update_user_portfolio(
     portfolio_id : int , 
     portfolio_update : PortfolioUpdate ,
-    db : Session  = Depends(get_db),
+    db : AsyncSession  = Depends(get_db),
     current_user = Depends(get_current_user)
 
 ):
-    
-    portfolio = db.query(PortfolioInfo).filter(
-
-        PortfolioInfo.portfolio_id == portfolio_id ,
-        PortfolioInfo.user_id == current_user.id
-        
-    ).first()
+    result = db.execute(select(PortfolioInfo).where( PortfolioInfo.portfolio_id == portfolio_id ,
+        PortfolioInfo.user_id == current_user.id))
+    portfolio = result.scalars().first()
 
     if not portfolio :
         raise HTTPException(
@@ -94,8 +92,8 @@ async def update_user_portfolio(
     for field , value in update_portfolio.items():
         setattr(portfolio , field , value)
 
-    db.commit()
-    db.refresh(portfolio)
+    await db.commit()
+    await db.refresh(portfolio)
 
     return{
         "message": "Portfolio updated successfully"
@@ -106,21 +104,21 @@ async def update_user_portfolio(
 @router.delete("/portfolio/{portfolio_id}" , status_code=status.HTTP_200_OK)
 async def deleting_portfolio(
     portfolio_id : int , 
-    db : Session = Depends(get_db) ,
+    db : AsyncSession = Depends(get_db) ,
     current_user = Depends(get_current_user)
-):
-    portfolio  = db.query(PortfolioInfo).filter(
+):  
+    result = db.execute(select(PortfolioInfo).where( PortfolioInfo.portfolio_id == portfolio_id ,
+        PortfolioInfo.user_id == current_user.id))
+     
+    portfolio = result.scalars().first()
 
-        PortfolioInfo.portfolio_id == portfolio_id ,
-        PortfolioInfo.user_id == current_user.id
-    ).first()
     if not portfolio :
         raise HTTPException(
             status_code= 404 ,detail= "portfolio not found "
         )
     
     portfolio.is_archived = True 
-    db.commit()
+    await db.commit()
 
     return {
         "message": "Portfolio archivd successfully"
@@ -133,11 +131,11 @@ async def deleting_portfolio(
 async def create_portfolio_source(
     portfolio_id : int , 
     portfolio_source  : PortfolioSourceValidation , 
-    db : Session = Depends(get_db),
+    db : AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user) ,
 ):
     service = PortfolioServices(db)
-    return service.creating_portfolio_info(portfolio_id= portfolio_id ,data= portfolio_source)
+    return await service.creating_portfolio_info(portfolio_id= portfolio_id ,data= portfolio_source)
 
 
 # get portfolio source , portolio_id as paramete , all soruces
@@ -145,11 +143,11 @@ async def create_portfolio_source(
 @router.get("/portfolio/{portfolio_id/sources}" , status_code=status.HTTP_200_OK , response_model=list[PortfolioSourceResponse ])
 async def get_portfolio_source(
     portfolio_id : int , # sent by client via querry 
-    db : Session = Depends(get_db) ,
+    db : AsyncSession = Depends(get_db) ,
     current_user = Depends(get_current_user) ,
 ):
     service =  PortfolioServices(db)
-    return service.getting_portfolio_sources(portfolio_id= portfolio_id)
+    return await service.getting_portfolio_sources(portfolio_id= portfolio_id)
 
 
 #  get portfolio source , portfolio_id and source_id , specific one 
@@ -157,11 +155,11 @@ async def get_portfolio_source(
 async def get_portfolio_source(
     portfolio_id : int , 
     source_id : int , 
-    db : Session = Depends(get_db),
+    db : AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
     service = PortfolioServices(db)
-    return service.getting_portfolio_source(
+    return await service.getting_portfolio_source(
         portfolio_id=portfolio_id ,
         source_id=source_id ,
         current_user=current_user
@@ -176,11 +174,11 @@ async def update_portfolio_source(
     portfolio_id: int,
     source_id: int,
     data: PortfolioSourceUpdate,
-    db: Session = Depends(get_db),
+    db: AsyncSession= Depends(get_db),
     current_user = Depends(get_current_user)  # Added to ensure they own it if needed
 ):
     service = PortfolioServices(db)
-    return service.update_portfolio_source(
+    return await service.update_portfolio_source(
         portfolio_id=portfolio_id, 
         source_id=source_id, 
         data=data
@@ -191,7 +189,7 @@ async def update_portfolio_source(
 async def delete_portfolio_source(
     portfolio_id: int,
     source_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
     service = PortfolioServices(db)
@@ -202,11 +200,11 @@ async def delete_portfolio_source(
 @router.get("/{asset_id}/" ,status_code= status.HTTP_200_OK) 
 async def list_assets(
     asset_id : int , 
-    db : Session = Depends(get_db) ,
+    db : AsyncSession = Depends(get_db) ,
     current_user = Depends(get_current_user)
 ):
     service = AssetsService(db)
-    return service.list_assets(
+    return await service.list_assets(
         asset_id=asset_id , 
     )
 
@@ -218,8 +216,8 @@ async def read_assets(
     sort_order : str = "asc",
     offset: int = 0 ,
     limit : int = 10 ,
-    db : Session = Depends(get_db),
+    db : AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
     service = AssetsService(db)
-    return service.get_assets(search_term , filter_type ,sort_by , sort_order , offset , limit)
+    return await service.get_assets(search_term , filter_type ,sort_by , sort_order , offset , limit)

@@ -7,6 +7,8 @@ from datetime import datetime , timedelta , timezone
 import jwt
 from passlib.context import CryptContext
 from app.config import settings
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import Depends , HTTPException , status
 from fastapi.security import OAuth2PasswordBearer
@@ -48,7 +50,7 @@ def create_refresh_token(data : dict):
     return encoded_jwt
 
 
-def get_current_user(token: str = Depends(oauth2_scheme) , db : Session = Depends(get_db)):
+async def get_current_user(token: str = Depends(oauth2_scheme) , db : AsyncSession = Depends(get_db)):
     credential_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED , 
         detail="Could not validate credentials",
@@ -61,8 +63,9 @@ def get_current_user(token: str = Depends(oauth2_scheme) , db : Session = Depend
             raise credential_exception
     except jwt.InvalidTokenError:
         raise credential_exception
-    
-    user = db.query(User).filter(User.mail == email).first()
+
+    result = await db.execute(select(User).where(User.mail == email)) 
+    user =result.scalars().first()
     if user is None :
         raise credential_exception
     return user

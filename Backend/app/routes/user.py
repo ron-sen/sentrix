@@ -2,6 +2,8 @@
 from fastapi import APIRouter , Depends , HTTPException , Response , status , Request , Cookie
 from typing import Annotated
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.db.connection import get_db
 from app.schemas.uservalidate import ValidateUser , CreateUser , PersonalProfileValidation  ,  PersonalProfileResponse , PersonalProfileUpdate
 
@@ -24,15 +26,17 @@ router = APIRouter()
 
 
 @router.get("/users")
-def get_users(db : Session = Depends(get_db)):
-    return db.query(User).all()
+async  def get_users(db : AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User))
+    return result.scalars().all()
 
 
 
 @router.post("/signup" , status_code=status.HTTP_201_CREATED)
-async def create_user_acc(user : CreateUser  , db: Session = Depends(get_db)):
+async def create_user_acc(user : CreateUser  , db: AsyncSession = Depends(get_db)):
 
-    existing_user = db.query(User).filter(User.mail == user.mail).first()
+    result = await db.execute(select(User).where(User.mail == user.mail))
+    existing_user = result.scalars().first()
 
     if existing_user :
         raise HTTPException(status_code=409 , detail = "User already registered")
@@ -44,8 +48,8 @@ async def create_user_acc(user : CreateUser  , db: Session = Depends(get_db)):
              
      )
     db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    await db.commit()
+    await db.refresh(new_user)
 
     token =  secret_token()
     expiry = token_expiry()
@@ -57,7 +61,7 @@ async def create_user_acc(user : CreateUser  , db: Session = Depends(get_db)):
         expires_at = expiry
     )
     db.add(verification_token)
-    db.commit()
+    await db.commit()
     await send_verification_Email(user.mail, token)
 
 
@@ -70,9 +74,10 @@ async def create_user_acc(user : CreateUser  , db: Session = Depends(get_db)):
 async def signin_for_access_token(
     response : Response ,
     form_data : Annotated[OAuth2PasswordRequestForm , Depends()],
-    db : Session = Depends(get_db)
+    db : AsyncSession = Depends(get_db)
 ):
-    user = db.query(User).filter(User.mail == form_data.username).first()
+    result = await db.execute(select(User).where(User.mail == form_data.username))
+    user = result.scalars().first()
 
     if not user or not verify_password(form_data.password , user.hashed_password):
         raise HTTPException(
@@ -113,9 +118,10 @@ async def signin_for_access_token(
 
 
 @router.get("/verify" , status_code=status.HTTP_200_OK)
-async def verify_email(token : str , response : Response , db : Session = Depends(get_db)):
+async def verify_email(token : str , response : Response , db : AsyncSession = Depends(get_db)):
 
-    token_verify = db.query(VerificationToken).filter(VerificationToken.token == token).first()
+    result = await db.execute(select(VerificationToken).where(VerificationToken.token == token))
+    token_verify = result.scalars().first()
 
     if not token_verify :
         raise HTTPException(
@@ -129,11 +135,12 @@ async def verify_email(token : str , response : Response , db : Session = Depend
     if token_verify.expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Token expired")
     
-    user = db.query(User).filter(User.id == token_verify.user_id).first()
+    result = await db.execute(select(User).where(User.id == token_verify.user_id))
+    user = result.scalars().first()
 
     user.is_verified = True 
     token_verify.used = True
-    db.commit()
+    await  db.commit()
     return{
         "message":"Email verified successfully"
     }
@@ -143,11 +150,12 @@ async def verify_email(token : str , response : Response , db : Session = Depend
 async def create_personal_user_profile(
     response : Response ,
     profile : PersonalProfileValidation ,
-    db : Session = Depends(get_db),
+    db : AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
     
-    exisiting = db.query(PersonalProfile).filter(PersonalProfile.user_id == current_user.id).first()
+    result = await db.execute(select(PersonalProfile).where( PersonalProfile.user_id== current_user.id))
+    exisiting = result.scalars().first()
 
     if exisiting:
         return exisiting 
@@ -172,8 +180,8 @@ async def create_personal_user_profile(
    
 
     db.add(new_profile)
-    db.commit()
-    db.refresh(new_profile)
+    await db.commit()
+    await db.refresh(new_profile)
 
     return {
         "message" : "Profile created sucessfully"
@@ -182,11 +190,11 @@ async def create_personal_user_profile(
 @router.get("/personal-profile" , status_code=status.HTTP_202_ACCEPTED)
 async def getting_personal_profile( 
     response : Response,
-    db : Session = Depends(get_db),
+    db : AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    
-    profile  = db.query(PersonalProfile).filter(PersonalProfile.user_id == current_user.id).first()
+    result = await db.execute(select(PersonalProfile).where(PersonalProfile.user_id == current_user.id))
+    profile  = result.scalars().first()
     
     if not profile :
         raise HTTPException(
@@ -246,10 +254,11 @@ async def signout(response : Response):
 @router.patch("/personal-profile")
 async def update_personal_profile(
     profile_update : PersonalProfileUpdate ,
-    db : Session = Depends(get_db),
+    db : AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user)
-):
-    profile  = db.query(PersonalProfile).filter(PersonalProfile.user_id == current_user.id).first()
+):  
+    result = await db.execute(select(PersonalProfile).where(PersonalProfile.user_id == current_user.id))
+    profile  = result.scalars().first()
 
     if not profile :
         raise HTTPException(
@@ -261,8 +270,8 @@ async def update_personal_profile(
     for field , value  in update_data.items():
         setattr(profile , field , value )
             
-    db.commit()
-    db.refresh(profile)
+    await db.commit()
+    await db.refresh(profile)
 
 
     return{

@@ -135,6 +135,8 @@ class PortfolioSourceUpdate(BaseModel):
 
     sync_status  : Optional[Literal['NOT_CONNECTED', 'ACTIVE', 'PAUSED', 'ERROR'] ] = None
 
+
+
 class SortFields(str , Enum):
     NAME = "name"
     ASSET_TYPE = "asset_type"
@@ -150,3 +152,24 @@ class FilterParams(BaseModel):
 
     sort_by : SortFields = SortFields.NAME
     sort_order : SortOrder = SortOrder.ASC
+
+
+class PortfolioTransactionValidation(BaseModel):
+
+    transaction_id : int
+    portfolio_id : Annotated[int , Field(..., description="None")]
+    source_id : Annotated[int , Field(...,)]
+    asset_id : Annotated[int , Field(..., description="None")]
+
+    transaction_type : Annotated[str , Field(..., description="transaction type" , min_length= 3 , max_length=24)]
+
+    quantity : Annotated[int , Field(...,description="quantity of asset")]
+    price_per_unit : int
+    fee_quantity : Annotated[int , Field(..., description="None")]
+    total_value : int
+    currency : Annotated[int , Field(..., description="currency")]
+    
+    
+class PortfolioPositionValidation(BaseModel):
+
+    pass
