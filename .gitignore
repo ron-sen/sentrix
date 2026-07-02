@@ -21,3 +21,6 @@ venv/
 
 # MyPy
 .mypy_cache/
+
+# my sql db 
+sentrix_backup.sql
