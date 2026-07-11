@@ -120,8 +120,8 @@ class BaseConnector(ABC):
         
         prices : dict[str , Decimal] = {}
 
-        for feild in ("open_price" , "high_price" , "low_price" , "close_price"):
-            value = row[feild]
+        for field in ("open_price" , "high_price" , "low_price" , "close_price"):
+            value = row[field]
 
             if isinstance(value , bool):
                 return f"{field} must be numeric"
