@@ -71,6 +71,7 @@ class Assets(Base):
     cmc_id: Mapped[Optional[str]] = mapped_column(String(120))
     # polygon
     polygon_ticker : Mapped[Optional[str]] = mapped_column(String(32))
+    binance_symbol: Mapped[Optional[str]] = mapped_column(String(32))
     
     decimals : Mapped[int] = mapped_column(Integer , nullable=False , default=18)
     is_active : Mapped[bool] = mapped_column(Boolean , nullable=False  , default=True)
