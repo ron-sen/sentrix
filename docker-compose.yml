@@ -1,0 +1,73 @@
+services:
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: sentrix-timescale
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: sentrix123
+      POSTGRES_DB: sentrix
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: sentrix-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Backend/Dockerfile
+    container_name: sentrix-backend
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - timescaledb
+      - redis
+    volumes:
+      - ./Backend:/app
+    restart: unless-stopped
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Backend/Dockerfile
+    container_name: sentrix-celery-worker
+    command: celery -A app.celery_app worker --loglevel=info
+    env_file:
+      - .env
+    depends_on:
+      - timescaledb
+      - redis
+    volumes:
+      - ./Backend:/app
+    restart: unless-stopped
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Backend/Dockerfile
+    container_name: sentrix-celery-beat
+    command: celery -A app.celery_app beat --loglevel=info
+    env_file:
+      - .env
+    depends_on:
+      - timescaledb
+      - redis
+    volumes:
+      - ./Backend:/app
+    restart: unless-stopped
+
+volumes:
+  timescale_data:
+  redis_data:
