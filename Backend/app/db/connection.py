@@ -7,6 +7,15 @@ Base = declarative_base()
 def get_engine():
     return create_async_engine(settings.DATABASE_URL, echo=False)
 
+# for celery tasks - initializing at module level ,
+
+CelerySessionLocal = async_sessionmaker(
+    bind = get_engine(),
+    class_ = AsyncSession ,
+    autoflush= False , 
+    expire_on_commit = False , 
+)
+
 AsyncSessionLocal = None
 
 async def get_db():
