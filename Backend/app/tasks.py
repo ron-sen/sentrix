@@ -3,56 +3,58 @@ import asyncio
 import logging  # logging module 
 
 from app.celery_app import celery_app
+import app.models  # ensures all SQLAlchemy models are registered before mapper configuration
 from app.connectors.orchestrator import MarketOrchestrator
 from app.db.connection import CelerySessionLocal
 
 logger = logging.getLogger(__name__) # what is __name__ --> built in variable that holds the current module name ,
 
 async def run_market_ingestion(timeframe: str):
+    async with CelerySessionLocal() as db:
 
-    """
-    async function that does the work ,  celery task can't be async directly so we separate the async logic here and call it via asyncio.run() from the task written below
+        """
+        async function that does the work ,  celery task can't be async directly so we separate the async logic here and call it via asyncio.run() from the task written below
 
-    """
+        """
+    
+    
 
-    db = CelerySessionLocal()  # creates a fredh asyncsession with db 
+        try :
+            # creating opensession and target timeframe 
+            # orchestrator will load all active assets and run the available connector per asset 
 
-    try :
-        # creating opensession and target timeframe 
-        # orchestrator will load all active assets and run the available connector per asset 
+            orchestrator = MarketOrchestrator(
+                db = db,
+                timeframe = timeframe , 
+            )
 
-        orchestrator = MarketOrchestrator(
-            db = db,
-            timeframe = timeframe , 
-        )
+            # running full pipline with 120 sec timeout , if it hangs longer then 2 minute (netwrok stall , db lock)and kill it 
+            # asyncio.wait_ for raises timeouterror if timeout exceeded
 
-        # running full pipline with 120 sec timeout , if it hangs longer then 2 minute (netwrok stall , db lock)and kill it 
-        # asyncio.wait_ for raises timeouterror if timeout exceeded
+            summaries = await asyncio.wait_for(
+                orchestrator.run(),
+                timeout = 120 ,
+            )
 
-        summaries = await asyncio.wait_for(
-            orchestrator.run(),
-            timeout = 120 ,
-        )
+            # commits any pending db writes after orchestrator finishes
+            await db.commit()
+            return summaries
 
-        # commits any pending db writes after orchestrator finishes
-        await db.commit()
-        return summaries
+        except Exception:
 
-    except Exception:
+            # if anything goes wrong , roll back any partial db writes
+            # prevents half baked candles rows from corrupting the hypertable
 
-        # if anything goes wrong , roll back any partial db writes
-        # prevents half baked candles rows from corrupting the hypertable
+            await db.rollback()
+            raise # re-raise so celery task above can handle retry logic
 
-        await db.rollback()
-        raise # re-raise so celery task above can handle retry logic
-
-    finally :
-        await db.close() #close the session whather sucess or failure 
+        finally :
+            await db.close() #close the session whather sucess or failure 
 
 
 @celery_app.task(
     bind = True ,  # give task access to self
-    name = "fetch_market_data", # excplicit task name  for beat schedule to references
+    name = "app.tasks.fetch_market_data", # excplicit task name  for beat schedule to references
     max_retries = 3 , # retry up to 3 times before giving up 
     default_retry_delay = 30, # wait 30 sec b/w retries 
 )
