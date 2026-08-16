@@ -7,13 +7,14 @@ from sqlalchemy import pool
 
 from alembic import context
 
+
 # imports 
 from app.config import settings
 from app.db.connection import Base
 
 from app.models.userauth import User , VerificationToken , PersonalProfile
 from app.models.portfolio_auth import PortfolioInfo , Assets , PortfolioSources 
-
+from app.models.nse import MarketInstruments, NSEPriceCandles, MarketBreadth
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
