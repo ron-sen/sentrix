@@ -5,12 +5,15 @@ import logging  # logging module
 from app.celery_app import celery_app
 import app.models  # ensures all SQLAlchemy models are registered before mapper configuration
 from app.connectors.orchestrator import MarketOrchestrator
-from app.db.connection import CelerySessionLocal
+from app.db.connection import get_celery_sessionmaker
+
+from app.indicator_task import compute_indicators 
 
 logger = logging.getLogger(__name__) # what is __name__ --> built in variable that holds the current module name ,
 
 async def run_market_ingestion(timeframe: str):
-    async with CelerySessionLocal() as db:
+    engine , session_factory = get_celery_sessionmaker()
+    async with session_factory() as db:
 
         """
         async function that does the work ,  celery task can't be async directly so we separate the async logic here and call it via asyncio.run() from the task written below
@@ -50,7 +53,7 @@ async def run_market_ingestion(timeframe: str):
 
         finally :
             await db.close() #close the session whather sucess or failure 
-
+            await engine.dispose()
 
 @celery_app.task(
     bind = True ,  # give task access to self
@@ -87,6 +90,9 @@ def fetch_market_data(self , timeframe : str) :
 
         # structred result dict and store it in redis , retrivie it by  task id 
 
+        # trigger delay because both fetch market and indicator fetch are in race
+
+        compute_indicators.delay( exchange = "AGGREGATED", timeframe = timeframe)
         result = {
             "status" : "completed_with_errors" if failed else "completed",
             "task_id" : self.request.id ,

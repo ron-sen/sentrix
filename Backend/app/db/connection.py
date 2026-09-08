@@ -9,12 +9,19 @@ def get_engine():
 
 # for celery tasks - initializing at module level ,
 
-CelerySessionLocal = async_sessionmaker(
-    bind = get_engine(),
-    class_ = AsyncSession ,
-    autoflush= False , 
-    expire_on_commit = False , 
-)
+def get_celery_sessionmaker():
+
+    """creates a fresh engine + sessionmaker bound to whichever event loop is currently running , must be called inside the async functio that async.io()ivokes for a celery task - never at module import time , since aysncpg connections can't cross event loop boundaries"""
+
+    engine = create_async_engine(settings.DATABASE_URL , echo=False)
+    session_factory = async_sessionmaker(
+        bind = engine ,
+        class_ = AsyncSession,
+        autoflush= False ,
+        expire_on_commit= False,
+
+    )
+    return engine , session_factory
 
 AsyncSessionLocal = None
 

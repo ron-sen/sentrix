@@ -10,7 +10,7 @@ celery_app = Celery(
     "sentrix",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND, # task results are stored 
-    include=["app.tasks"],
+    include=["app.tasks" , "app.indicator_task"],
 )
 
 celery_app.conf.update(
@@ -28,7 +28,7 @@ celery_app.conf.update(
 celery_app.conf.beat_schedule = {
     "fetch-market-candles-1h" :{
         "task" : "app.tasks.fetch_market_data", # matches name in @celery
-        "schedule" : 30.0 , # top of every hr 
+        "schedule" : 30.0 , # every 30 sec 
         "args" : ("1m",) ,
     },
 }

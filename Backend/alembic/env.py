@@ -15,7 +15,7 @@ from app.db.connection import Base
 from app.models.userauth import User , VerificationToken , PersonalProfile
 from app.models.portfolio_auth import PortfolioInfo , Assets , PortfolioSources 
 from app.models.nse import MarketInstruments, NSEPriceCandles, MarketBreadth
-
+from app.models.indicator import IndicatorValues, IndicatorSignal
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
