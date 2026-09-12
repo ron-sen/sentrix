@@ -6,7 +6,7 @@ consumes pandas series/dataframe produced by calculations.pyand return clean , v
 
 import numpy as np
 import pandas as pd
-from app.indicators.constants import (
+from app.ml.indicators.constants import (
     ADX_STRONG_THRESHOLD,
     ADX_WEAK_THRESHOLD,
     ATR_BASELINE_PERIOD,

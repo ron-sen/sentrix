@@ -47,3 +47,8 @@ STOCH_OVERSOLD_THRESHOLD : float = 20.0
 STOCH_OVERBOUGHT_THRESHOLD : float = 80.0
 
 FLAT_THRESHOLD_PCT: float = 0.05
+
+
+# MACD normalized as perecentange price oscillator(PPO) - asset agnotstic scale
+PPO_FAST_PERIOD : int = 12
+PPO_SLOW_PERIOD : int = 26 

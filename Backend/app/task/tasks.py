@@ -6,8 +6,9 @@ from app.celery_app import celery_app
 import app.models  # ensures all SQLAlchemy models are registered before mapper configuration
 from app.connectors.orchestrator import MarketOrchestrator
 from app.db.connection import get_celery_sessionmaker
+from app.task.fuzzy_task import compute_suitability_task
 
-from app.indicator_task import compute_indicators 
+from app.task.indicator_task import compute_indicators
 
 logger = logging.getLogger(__name__) # what is __name__ --> built in variable that holds the current module name ,
 
@@ -93,6 +94,8 @@ def fetch_market_data(self , timeframe : str) :
         # trigger delay because both fetch market and indicator fetch are in race
 
         compute_indicators.delay( exchange = "AGGREGATED", timeframe = timeframe)
+        compute_suitability_task.delay()
+        
         result = {
             "status" : "completed_with_errors" if failed else "completed",
             "task_id" : self.request.id ,

@@ -10,7 +10,7 @@ celery_app = Celery(
     "sentrix",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND, # task results are stored 
-    include=["app.tasks" , "app.indicator_task"],
+    include=["app.task.tasks" , "app.task.indicator_task" , "app.task.fuzzy_task"],
 )
 
 celery_app.conf.update(

@@ -34,6 +34,8 @@ dependencies = [
     "nsepython (>=2.97,<3.0)",
     "yfinance (>=1.6.0,<2.0.0)",
     "matplotlib (<3.11)",
+    "scikit-fuzzy (>=0.5.0,<0.6.0)",
+    "networkx (<3.3)",
 ]
 
 [tool.poetry]

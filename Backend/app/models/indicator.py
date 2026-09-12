@@ -26,7 +26,7 @@ class IndicatorValues(Base):
     macd_line : Mapped[float] = mapped_column(Numeric , nullable= False)
     macd_signal : Mapped[float] = mapped_column(Numeric , nullable= False)
     macd_hist : Mapped[float] = mapped_column(Numeric, nullable= False)
-
+    ppo: Mapped[Optional[float]] = mapped_column(Numeric, nullable=True)
 
     # bollinger band 
     
@@ -120,4 +120,25 @@ class IndicatorSignal(Base):
 
         CheckConstraint("stoch_crossover IN ('bullish','bearish','none')", name="ck_stoch_crossover"),
 
+    )
+
+
+class SuitabilityScores(Base) :
+
+    __tablename__ = "suitability_scores"
+
+    asset_id : Mapped[int] = mapped_column(BigInteger , ForeignKey("assets.asset_id") , primary_key= True , nullable=False)
+    
+    timestamp : Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True) , primary_key=True , nullable=False)
+
+    suitability_score : Mapped[float] = mapped_column(Numeric , nullable=False)
+
+    rsi_input : Mapped[float] = mapped_column(Numeric , nullable=False)
+
+    ppo_input : Mapped[float] = mapped_column(Numeric , nullable=False)
+
+    atr_input : Mapped[float] = mapped_column(Numeric , nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("suitability_score >= 0 AND suitability_score <= 100", name="ck_suitability_range"),
     )

@@ -17,9 +17,9 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
  
-from app.indicators import calculations as calc
-from app.indicators import signals as sig
-from app.indicators.constants import (
+from app.ml.indicators import calculations as calc
+from app.ml.indicators import signals as sig
+from app.ml.indicators.constants import (
     DEFAULT_ADX_PERIOD,
     DEFAULT_ATR_PERIOD,
     DEFAULT_BB_PERIOD,
@@ -31,8 +31,9 @@ from app.indicators.constants import (
     DEFAULT_SMA_PERIOD,
     DEFAULT_STOCH_D_PERIOD,
     DEFAULT_STOCH_K_PERIOD,
+    PPO_FAST_PERIOD,
+    PPO_SLOW_PERIOD,
 )
-
 # import our db  orm models 
 
 from app.models.indicator import IndicatorSignal , IndicatorValues 
@@ -134,6 +135,8 @@ class IndicatorEngine :
         sma_series = calc.calculate_sma(df["close"], period=DEFAULT_SMA_PERIOD)
         ema_series = calc.calculate_ema(df["close"], period=DEFAULT_EMA_PERIOD)
         rsi_series = calc.calculate_rsi(df["close"], period=DEFAULT_RSI_PERIOD)
+        ppo_series = calc.calculate_ppo(df["close"], fast_period=PPO_FAST_PERIOD, slow_period=PPO_SLOW_PERIOD)
+
         macd_df = calc.calculate_macd(
             df["close"],
             fast_period=DEFAULT_MACD_FAST,
@@ -176,6 +179,9 @@ class IndicatorEngine :
             "macd_line": self._safe_float(macd_df["macd"].loc[latest_idx]),
             "macd_signal": self._safe_float(macd_df["macd_signal"].loc[latest_idx]),
             "macd_hist": self._safe_float(macd_df["macd_hist"].loc[latest_idx]),
+
+            "ppo": self._safe_float(ppo_series.loc[latest_idx]) ,
+
             "bb_upper": self._safe_float(bb_df["bb_upper"].loc[latest_idx]),
             "bb_middle": self._safe_float(bb_df["bb_middle"].loc[latest_idx]),
             "bb_lower": self._safe_float(bb_df["bb_lower"].loc[latest_idx]),

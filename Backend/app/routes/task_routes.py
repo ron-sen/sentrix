@@ -1,5 +1,5 @@
 
-from app.tasks import  fetch_market_data
+from app.task.tasks import fetch_market_data
 from fastapi import APIRouter , Response , Request , status , Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.connection import get_db

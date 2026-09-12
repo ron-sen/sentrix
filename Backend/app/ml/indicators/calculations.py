@@ -7,7 +7,7 @@
 
 import numpy as np 
 import pandas as pd 
-from app.indicators.constants import(
+from app.ml.indicators.constants import(
     DEFAULT_MACD_FAST,
     DEFAULT_MACD_SIGNAL,
     DEFAULT_MACD_SLOW,
@@ -20,6 +20,8 @@ from app.indicators.constants import(
     DEFAULT_STOCH_D_PERIOD,
     DEFAULT_STOCH_K_PERIOD,
     DEFAULT_EMA_PERIOD ,
+    PPO_FAST_PERIOD,
+    PPO_SLOW_PERIOD
 )
 
 def calculate_sma(
@@ -273,7 +275,18 @@ def calculate_vwap(df: pd.DataFrame) -> pd.Series:
     cum_vol_price = (df["close"] * df["volume"]).cumsum()
     return cum_vol_price / cum_vol.replace(0, np.nan)
 
+def calculate_ppo(
+        series : pd.Series,
+        fast_period : int = PPO_FAST_PERIOD ,
+        slow_period : int = PPO_SLOW_PERIOD ,
+)-> pd.Series :
 
+    """percentage price oscillator - macd normalized as % of price ,so it's comparable acorss at any price scale."""
 
+    if len(series) < slow_period :
+        return pd.Series(index = series.index , dtype = "flaot64")
 
+    fast_ema = series.ewm(span=fast_period , adjust=False).mean()
+    slow_ema = series.ewm(span=slow_period , adjust=False).mean()
 
+    return ((fast_ema - slow_ema)/ slow_ema.replace(0 , np.nan)) * 100.0

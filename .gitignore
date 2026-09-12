@@ -24,3 +24,6 @@ venv/
 
 # my sql db 
 sentrix_backup.sql
+
+#celery beat-schedule
+celerybeat-schedule

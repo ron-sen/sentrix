@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.celery_app import celery_app
 import app.models 
 from app.db.connection import get_celery_sessionmaker
-from app.indicators.engine import IndicatorEngine
+from app.ml.indicators.engine import IndicatorEngine
 from app.models.portfolio_auth import Assets
 
 logger = logging.getLogger(__name__)

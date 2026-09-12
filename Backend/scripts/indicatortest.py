@@ -1,8 +1,8 @@
 # throwaway script, not part of app/ — just paste in a REPL or scratch file
 import pandas as pd
 import numpy as np
-from app.indicators import calculations as calc
-from app.indicators import signals as sig
+from app.ml.indicators import calculations as calc
+from app.ml.indicators import signals as sig
 
 # fake 60 rows of OHLCV so every indicator has enough lookback
 idx = pd.date_range("2026-01-01", periods=60, freq="1min", tz="UTC")
