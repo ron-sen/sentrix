@@ -28,7 +28,7 @@ async def send_verification_Email(email : str , token : str ):
     message = MessageSchema(
         subject="mail-verification",
         recipients = [email] ,
-        body = f"<p>Click to verify: http://localhost:8000/verify?token={token}</p>",
+        body = f'<p>Click to verify: <a href="{settings.FRONTEND_URL}/auth/verify-email?token={token}">Verify email</a></p>',
         subtype = MessageType.html
     )
     fm = FastMail(conf)

@@ -10,6 +10,7 @@ import app.models
 from app.db.connection import get_celery_sessionmaker
 from app.ml.indicators.engine import IndicatorEngine
 from app.models.portfolio_auth import Assets
+from app.task.fuzzy_task import compute_suitability_task
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,8 @@ def compute_indicators(self ,exchange : str = "AGGREGATED" , timeframe : str = "
         failed = [item for item in summaries if item.get("error")]
         succeeded = [item for item in summaries if not item.get("error")]
 
+        compute_suitability_task.delay()
+        
         result = {
             "status": "completed_with_errors" if failed else "completed",
             "task_id" : self.request.id ,

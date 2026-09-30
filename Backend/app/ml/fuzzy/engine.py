@@ -2,7 +2,7 @@
 fuzzy suitability engine rsi(momentum) + ppo (trend) + ATR ( voltaility) , quantile - calibrated triangular membership functions , all 27 rules genrated programmatically from a weighted scoring table (see RULE_WEIGHT below) calibration is cached per asset and rebuilt on a fixed interval , not every tick.
 
 """
-
+import logging
 import time
 from itertools import product
 
@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
+
+logger = logging.getLogger(__name__)
 
 RSI_TERMS = ["oversold", "neutral", "overbought"]
 PPO_TERMS = ["bearish", "neutral", "bullish"]
@@ -30,11 +32,11 @@ CACHE_TTL_SECONDS = 4 * 60 * 60  # rebuild every 4 hours
 _engine_cache: dict[int, tuple[float, "ctrl.ControlSystemSimulation"]] = {}
 
 
-def calibrate_quantile_bounds(series: pd.Series, low_q=0.15, mid_q=0.50, high_q=0.85):
+def calibrate_quantile_bounds(series: pd.Series, low_q=0.10, mid_q=0.50, high_q=0.90):
     """Returns (low, mid, high) anchor points from an indicator's own history."""
     clean = series.dropna()
-    if len(clean) < 30:
-        raise ValueError("Not enough history to calibrate — need at least 30 points")
+    if len(clean) < 100:
+        raise ValueError("Need atleast 100 continuous points to calibrate Fuzzy FIS")
     low, mid, high = clean.quantile([low_q, mid_q, high_q])
     return float(low), float(mid), float(high)
 
@@ -66,15 +68,15 @@ def _build_rules(rsi, ppo, atr, suitability) -> list:
     return rules
 
 
-def build_fis(rsi_history: pd.Series, ppo_history: pd.Series, atr_history: pd.Series):
+def build_fis(rsi_history: pd.Series, ppo_history: pd.Series, atr_pct_history: pd.Series):
     """Builds one fresh calibrated FIS from historical indicator series."""
     rsi_lo, rsi_mid, rsi_hi = calibrate_quantile_bounds(rsi_history)
     ppo_lo, ppo_mid, ppo_hi = calibrate_quantile_bounds(ppo_history)
-    atr_lo, atr_mid, atr_hi = calibrate_quantile_bounds(atr_history)
+    atr_lo, atr_mid, atr_hi = calibrate_quantile_bounds(atr_pct_history)
 
     x_rsi = np.arange(0, 101, 1)
     x_ppo = np.linspace(ppo_history.min(), ppo_history.max(), 200)
-    x_atr = np.linspace(atr_history.min(), atr_history.max(), 200)
+    x_atr = np.linspace(atr_pct_history.min(), atr_pct_history.max(), 200)
     x_score = np.arange(0, 101, 1)
 
     rsi = ctrl.Antecedent(x_rsi, "rsi")
@@ -122,21 +124,24 @@ def compute_suitability(
     asset_id: int,
     rsi_history: pd.Series,
     ppo_history: pd.Series,
-    atr_history: pd.Series,
+    atr_pct_history: pd.Series,
     current_rsi: float,
     current_ppo: float,
-    current_atr: float,
+    current_atr_pct: float,
 ) -> dict:
     """Runs the FIS on current values, returns crisp suitability score."""
-    sim = get_or_build_fis(asset_id, rsi_history, ppo_history, atr_history)
+    sim = get_or_build_fis(asset_id, rsi_history, ppo_history, atr_pct_history)
 
     sim.input["rsi"] = float(np.clip(current_rsi, 0, 100))
     sim.input["ppo"] = float(np.clip(current_ppo, ppo_history.min(), ppo_history.max()))
-    sim.input["atr"] = float(np.clip(current_atr, atr_history.min(), atr_history.max()))
+    sim.input["atr"] = float(np.clip(current_atr_pct, atr_pct_history.min(), atr_pct_history.max()))
 
-    print(f"DEBUG asset={asset_id} rsi={current_rsi} ppo={current_ppo} atr={current_atr}")
-    print(f"DEBUG ppo_range=({ppo_history.min()}, {ppo_history.max()}) atr_range=({atr_history.min()}, {atr_history.max()})")
+    """
+    print(f"DEBUG asset={asset_id} rsi={current_rsi} ppo={current_ppo} atr={current_atr_pct}")
+    print(f"DEBUG ppo_range=({ppo_history.min()}, {ppo_history.max()}) atr_range=({atr_pct_history.min()}, {atr_pct_history.max()})")
+    """
     
+    logger.debug(f"Asset={asset_id} RSI={current_rsi:.2f} PPO={current_ppo:.2f} ATR_PCT={current_atr_pct:.2f}%")
     sim.compute()
     score = float(sim.output["suitability"])
 

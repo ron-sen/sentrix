@@ -13,13 +13,13 @@ from app.celery_app import celery_app
 import app.models
 from app.db.connection import get_celery_sessionmaker
 from app.ml.fuzzy.engine import compute_suitability
-from app.models.portfolio_auth import Assets
+from app.models.portfolio_auth import Assets , MarketPriceCandles
 from app.models.indicator import IndicatorValues , SuitabilityScores
 from sqlalchemy.dialects.postgresql import insert
 
 logger = logging.getLogger(__name__)
 
-MIN_HISTORY_ROWS = 30 # matches calibrate quantile bounds minimum
+MIN_HISTORY_ROWS = 100 # matches calibrate quantile bounds minimum , new improvision  is 100 
 
 
 async def run_fuzzy_computation():
@@ -37,20 +37,64 @@ async def run_fuzzy_computation():
 
             for asset in active_assets:
                 try :
-                    stmt = (
-                        select(IndicatorValues).where(IndicatorValues.asset_id == asset.asset_id).order_by(IndicatorValues.timestamp.desc()).limit(200) # a bit above min_history_rows for headroom
+                     # querrying indicator values
+                    ind_stmt = (
+                        select(IndicatorValues).where(IndicatorValues.asset_id == asset.asset_id).order_by(IndicatorValues.timestamp.desc()).limit(300) # a bit above min_history_rows for headroom
                     )
-                    rows_result = await db.execute(stmt)
-                    rows = rows_result.scalars().all()
+                    ind_rows =( await db.execute(ind_stmt)).scalars().all()
 
-                    if len(rows) < MIN_HISTORY_ROWS :
+                    # querrying matching market candle close prices 
+                    candle_stmt = (
+                        select(MarketPriceCandles).where(MarketPriceCandles.asset_id == asset.asset_id).order_by(MarketPriceCandles.candle_time.desc()).limit(300)
+                    )
+                    candle_rows =  (await db.execute(candle_stmt)).scalars().all()
+
+                    if len(ind_rows) < MIN_HISTORY_ROWS or len(candle_rows) < MIN_HISTORY_ROWS :
                         summaries.append({
                             "asset_id" : asset.asset_id,
-                            "error" : f"insufficient history ({len(rows)} , need {MIN_HISTORY_ROWS})",
+                            "error" : f"insufficient history ({len(ind_rows)} , need {MIN_HISTORY_ROWS})",
                         })
 
                         continue
 
+                    # converting dataframes and join on timestamp to calculate atr_pct
+
+                    df_ind = pd.DataFrame([
+                        {
+                            "timestamp" : r.timestamp ,
+                            "rsi": float(r.rsi) if r.rsi is not None else None,
+                            "ppo": float(r.ppo) if r.ppo is not None else None,
+                            "atr": float(r.atr) if r.atr is not None else None,
+                        }
+                        for r in ind_rows
+                    ])
+
+                    df_candles = pd.DataFrame([
+                        {
+                            "timestamp" : c.candle_time , "close" :float(c.close_price)
+                        }for c in candle_rows
+                    ])
+
+                    merged = pd.merge(df_ind, df_candles, on="timestamp", how="inner")
+                    merged = merged.sort_values("timestamp").reset_index(drop=True)
+                    merged = merged.dropna(subset=["rsi", "ppo", "atr", "close"])
+
+                    if len(merged) < MIN_HISTORY_ROWS:
+                        summaries.append({
+                            "asset_id": asset.asset_id,
+                            "error": f"insufficient merged history ({len(merged)} rows)",
+                        })
+                        continue
+
+                    # Calculate scale-invariant ATR percentage
+                    merged["atr_pct"] = (merged["atr"] / merged["close"]) * 100.0
+
+                    rsi_history = merged["rsi"]
+                    ppo_history = merged["ppo"]
+                    atr_pct_history = merged["atr_pct"]
+
+
+                    """
                     # rows com back newest -fist ; reverse for chronological order
                     rows = list(reversed(rows))
 
@@ -65,24 +109,27 @@ async def run_fuzzy_computation():
                             "error" : "latest row missing rsi/ppo/atr",
                         })
                         continue
+                    """
+
+                    latest = merged.iloc[-1]
 
                     result_dict = compute_suitability(
                         asset_id= asset.asset_id,
                         rsi_history=rsi_history,
                         ppo_history=ppo_history,
-                        atr_history=atr_history,
-                        current_rsi=float(latest.rsi),
-                        current_ppo = float(latest.ppo),
-                        current_atr = float(latest.atr),
+                        atr_pct_history=atr_pct_history,
+                        current_rsi=float(latest["rsi"]),
+                        current_ppo=float(latest["ppo"]),
+                        current_atr_pct=float(latest["atr_pct"]),
                     )
 
                     payload = {
-                        "asset_id" : asset.asset_id,
-                        "timestamp" : latest.timestamp ,
-                        "suitability_score" : result_dict["suitability_score"],
-                        "rsi_input" : float(latest.rsi),
-                        "ppo_input" : float(latest.ppo),
-                        "atr_input" : float(latest.atr),
+                        "asset_id": asset.asset_id,
+                        "timestamp": latest["timestamp"],
+                        "suitability_score": result_dict["suitability_score"],
+                        "rsi_input": float(latest["rsi"]),
+                        "ppo_input": float(latest["ppo"]),
+                        "atr_input": float(latest["atr_pct"]),
                     }
 
                     stmt = insert(SuitabilityScores).values(**payload)
@@ -136,7 +183,7 @@ def compute_suitability_task(self):
 
         logger.info(
             "Fuzzy suitability computation finished",
-            extra = {"task_id" : self.request.id , "assets_processed" : len(succeeded) , "asset_failed" : len(failed)},
+            extra = {"task_id" : self.request.id , "assets_processed" : len(succeeded) , "assets_failed" : len(failed)},
         )
 
         return result

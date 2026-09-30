@@ -34,6 +34,8 @@ from app.ml.indicators.constants import (
     PPO_FAST_PERIOD,
     PPO_SLOW_PERIOD,
 )
+
+MIN_WARMUP_BARS = 100  # inside engine.py / celery pipline task
 # import our db  orm models 
 
 from app.models.indicator import IndicatorSignal , IndicatorValues 
@@ -78,7 +80,7 @@ class IndicatorEngine :
 
     """ orchestrates candle retrieval  , data cleaning , indicator calculation , signal derivation , and DB presistence per asset. """
 
-    def __init__(self, db_session: AsyncSession, lookback_bars: int = 300):
+    def __init__(self, db_session: AsyncSession, lookback_bars: int = 1440):
         self.db = db_session
         self.lookback_bars = lookback_bars
 
@@ -231,6 +233,27 @@ class IndicatorEngine :
             index_elements=["asset_id", "timestamp"], set_=update_dict
         )
         await self.db.execute(on_conflict_stmt)
+
+    # new improvision : enfore gap detectiona
+    async def process_asset_with_gap_detection(self , asset_id : int , exchange : str  = "AGGREGATED" , timeframe : str = "1m"):
+
+        df = await self.fetch_ohlcv(asset_id = asset_id , exchange = exchange , timeframe = timeframe)
+
+        if len(df) < MIN_WARMUP_BARS : 
+            logger.warning(f"Asset {asset_id} has insufficient historical candles ({len(df)}/{MIN_WARMUP_BARS}). Skipping signal generation until warm.")
+
+        # check for timestamp continuity on the most recent 30 bars
+
+        recent_timestamp = df.index[-30:]
+        time_diffs = recent_timestamp.to_series().diff()
+
+        if (time_diffs > pd.Timedelta(minutes = 2 )).any():
+            logger.error(f"Timestamp gap detected in recent candles for asset { asset_id} , Triggering REST API backfill...")
+            # Trigger historical REST backfill service here before  calcultating signals 
+
+            # proceed to indicator and fuzzy suitability calculations safely 
+            await self.process_asset(asset_id= asset_id , exchange= exchange , timeframe= timeframe)
+
 
     @staticmethod
     def _safe_float(val) -> Optional[float]:

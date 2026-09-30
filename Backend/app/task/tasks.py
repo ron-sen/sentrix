@@ -20,9 +20,6 @@ async def run_market_ingestion(timeframe: str):
         async function that does the work ,  celery task can't be async directly so we separate the async logic here and call it via asyncio.run() from the task written below
 
         """
-    
-    
-
         try :
             # creating opensession and target timeframe 
             # orchestrator will load all active assets and run the available connector per asset 
@@ -94,7 +91,6 @@ def fetch_market_data(self , timeframe : str) :
         # trigger delay because both fetch market and indicator fetch are in race
 
         compute_indicators.delay( exchange = "AGGREGATED", timeframe = timeframe)
-        compute_suitability_task.delay()
         
         result = {
             "status" : "completed_with_errors" if failed else "completed",

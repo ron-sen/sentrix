@@ -97,16 +97,16 @@ async def signin_for_access_token(
         key = "access_token" ,
         value = access_token ,
         httponly = True , 
-        samesite = "lax" ,
-        secure = True 
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
     )
 
     response.set_cookie(
         key = "refresh_token" ,
         value = refresh_token ,
         httponly = True ,
-        samesite = "lax" ,
-        secure = True 
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
     )
 
     return{
@@ -233,8 +233,8 @@ async def refresh_token(
         key="access_token",
         value=new_access_token,
         httponly=True , 
-        secure = True ,
-        samesite= "lax"
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
     )
 
     return {
